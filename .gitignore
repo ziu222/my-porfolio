@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output and local caches
+dist/
+.output/
+.nitro/
+.vinxi/
+.tanstack/
+.wrangler/
+
+# Local environment and secrets
+.env
+.env.*
+.dev.vars
+*.local
+
+# Local tooling and editor state
+.claude/
+.impeccable/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
