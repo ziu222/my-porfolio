@@ -492,7 +492,7 @@ html[data-motion="reduce"] .ng-term { animation: ng-fade 0.2s ease; }
 .ng-vinyl-sheen { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: linear-gradient(135deg, transparent 38%, rgba(255, 255, 255, 0.14) 50%, transparent 62%); }
 /* SVG tonearm pivots at its top-right knob and settles onto the record while playing */
 .ng-tonearm { position: absolute; top: -9px; right: -14px; width: 26px; height: 50px; overflow: visible; pointer-events: none; filter: drop-shadow(1px 2px 1.5px rgba(0, 0, 0, 0.55)); }
-.ng-tonearm-swing { transform-box: view-box; transform-origin: 22px 9px; transform: rotate(-9deg); transition: transform 0.9s cubic-bezier(0.34, 1.3, 0.5, 1); }
+.ng-tonearm-swing { transform-box: view-box; transform-origin: 22px 9px; transform: rotate(-9deg); transition: transform 0.9s cubic-bezier(0.25, 1, 0.5, 1); }
 .ng-player[data-playing] .ng-tonearm-swing { transform: rotate(17deg); }
 .ng-player-meta { display: grid; line-height: 1.25; min-width: 104px; }
 .ng-player-title { font-family: var(--ng-display); font-size: 0.86rem; font-weight: 700; }

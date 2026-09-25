@@ -12,6 +12,7 @@
     "build": "bun run check:ui && tsr generate && tsc --noEmit && vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
+    "deploy": "bun run build && bun x wrangler deploy",
     "postinstall": "node scripts/verify-install.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
