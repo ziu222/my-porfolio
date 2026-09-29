@@ -187,53 +187,90 @@ export function BlackHole() {
       return r.top < window.innerHeight * 0.55 && window.scrollY + window.innerHeight >= root.scrollHeight - 4;
     };
 
-    // ---- the swallow: everything on screen spirals into the hole ----
+    // ---- the swallow: each piece on screen falls in on its own orbit ----
+    // Per piece, per frame: it spirals in on a Kepler-like orbit (angular speed grows as r^-1.5),
+    // turns to keep facing the hole, is stretched along the radius and squeezed across it by the
+    // tide (which grows as 1/r^3), and near the horizon it slows, reddens, dims and fades, the way
+    // a distant observer sees infalling matter freeze at the horizon. Nearer pieces go first.
     const SUCK = 1900, RESET = 1950, DONE = 2600;
-    let phase: "idle" | "suck" = "idle", suckAt = 0, reset = false;
-    let anims: Animation[] = [];
-    const inward = [0.55, 0, 0.9, 0.35].join(", ");
+    const PIECES = [
+      ".ng-contact .ng-wrap > *", ".ng-contact .ng-orbits", ".ng-contact > canvas",
+      ".ng-footer > p", ".ng-nav", ".ng-player-dock", ".ng-cmp",
+    ];
+    const SAVED = ["transform", "transformOrigin", "filter", "opacity", "animation", "transition"] as const;
+    type Piece = {
+      el: HTMLElement; vx: number; vy: number; r0: number; th: number; th0: number; lead: number;
+      ox: number; oy: number; saved: Record<(typeof SAVED)[number], string>;
+    };
+    let pieces: Piece[] = [];
+    let phase: "idle" | "suck" = "idle", suckAt = 0, reset = false, lastT = 0;
+    const holeAt = () => {
+      const c = canvas.getBoundingClientRect();
+      return { x: c.left + c.width / 2, y: c.top + c.height / 2, h: c.height };
+    };
     const swallow = () => {
-      const r = section.getBoundingClientRect();
-      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      // the page itself turns around the hole and shrinks into it
-      for (const el of document.querySelectorAll<HTMLElement>(".ng-page > main, .ng-footer")) {
+      const hole = holeAt(), W = window.innerWidth, H = window.innerHeight;
+      pieces = [];
+      for (const el of document.querySelectorAll<HTMLElement>(PIECES.join(","))) {
         const b = el.getBoundingClientRect();
-        el.style.transformOrigin = `${cx - b.left}px ${cy - b.top}px`;
-        anims.push(el.animate(
-          [
-            { transform: "none", filter: "none", opacity: 1 },
-            { transform: "rotate(160deg) scale(0.62)", filter: "blur(1px)", opacity: 0.9, offset: 0.55 },
-            { transform: "rotate(560deg) scale(0)", filter: "blur(6px)", opacity: 0 },
-          ],
-          { duration: SUCK, easing: `cubic-bezier(${inward})`, fill: "forwards" },
-        ));
+        if (b.width < 2 || b.height < 2 || b.bottom < 0 || b.top > H || b.right < 0 || b.left > W) continue;
+        const vx = b.left + b.width / 2, vy = b.top + b.height / 2;
+        const dx = vx - hole.x, dy = vy - hole.y;
+        // only a pure translation is expected as an existing transform (the nav, Nova)
+        const m = new DOMMatrixReadOnly(getComputedStyle(el).transform === "none" ? undefined : getComputedStyle(el).transform);
+        const saved = Object.fromEntries(SAVED.map((k) => [k, el.style[k]])) as Piece["saved"];
+        pieces.push({ el, vx, vy, r0: Math.max(1, Math.hypot(dx, dy)), th: Math.atan2(dy, dx), th0: Math.atan2(dy, dx), lead: 0, ox: m.e, oy: m.f, saved });
       }
-      // the fixed pieces fly in on their own spirals: navigation, record player, Nova
-      const loose: [string, number][] = [[".ng-nav", 0], [".ng-player-dock", 90], [".ng-cmp", 160]];
-      for (const [sel, delay] of loose) {
-        const el = document.querySelector<HTMLElement>(sel);
-        if (!el) continue;
-        const b = el.getBoundingClientRect();
-        const dx = cx - (b.left + b.width / 2), dy = cy - (b.top + b.height / 2);
-        // Nova (with its speech bubble) tumbles more than the rest; its position is an inline
-        // transform, so the animation is composited on top of it rather than replacing it
-        const nova = sel === ".ng-cmp";
-        const turn = nova ? 1080 : 540;
-        anims.push(el.animate(
-          [
-            { transform: "translate(0, 0) rotate(0deg) scale(1)", opacity: 1 },
-            // swing out a little first, then fall in: a curve, not a straight line
-            { transform: `translate(${(dx * 0.35 - dy * 0.25).toFixed(0)}px, ${(dy * 0.35 + dx * 0.25).toFixed(0)}px) rotate(${turn * 0.35}deg) scale(0.75)`, opacity: 1, offset: 0.5 },
-            { transform: `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) rotate(${turn}deg) scale(0)`, opacity: 0 },
-          ],
-          { duration: SUCK - delay, delay, easing: `cubic-bezier(${inward})`, fill: "forwards", composite: nova ? "add" : "replace" },
-        ));
+      const far = Math.max(...pieces.map((p) => p.r0), 1);
+      for (const p of pieces) {
+        p.lead = 0.28 * (p.r0 / far); // tidal order: the nearest start falling first
+        p.el.style.animation = "none";
+        p.el.style.transition = "none";
+        p.el.style.transformOrigin = "50% 50%";
+      }
+      // anything else on the page (backgrounds, off-screen sections) just fades out
+      for (const el of document.querySelectorAll<HTMLElement>(".ng-page > main, .ng-footer")) {
+        el.animate([{ opacity: 1 }, { opacity: 1, offset: 0.6 }, { opacity: 0 }], { duration: SUCK, fill: "forwards" });
+      }
+      lastT = performance.now();
+    };
+    const fall = (now: number, rsNow: number) => {
+      const hole = holeAt();
+      const Rh = Math.max(24, rsNow * hole.h / 2); // horizon radius in CSS px
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      const T = (now - suckAt) / SUCK;
+      for (const p of pieces) {
+        const tau = clamp01((T - p.lead) / (1 - p.lead));
+        // falls slowly at first, fastest mid-way, then crawls as it nears the horizon
+        const s = tau * tau * (3 - 2 * tau);
+        const r = Rh + (p.r0 - Rh) * (1 - s);
+        // Kepler-ish: the closer in, the faster it goes round (anticlockwise, with the disk)
+        const w = Math.min(14, 0.9 * Math.pow((Rh * 4) / Math.max(r, Rh), 1.5));
+        if (tau > 0) p.th -= w * dt;
+        const c = Math.cos(p.th), sn = Math.sin(p.th);
+        const x = hole.x + c * r, y = hole.y + sn * r;
+        // the tide: stretched along the radius, squeezed across it, and shrunk as it recedes
+        const tide = Math.min(1, Math.pow((Rh * 2.2) / r, 3));
+        const stretch = 1 + 2.1 * tide, squeeze = 1 / Math.pow(stretch, 0.8);
+        const size = 0.3 + 0.7 * Math.pow(r / p.r0, 0.6);
+        const a = stretch * size, bb = squeeze * size;
+        // M = R(th) diag(a, b) R(-th) R(spin): stretch along the radial axis, turned with the orbit
+        const spin = p.th - p.th0;
+        const m11 = a * c * c + bb * sn * sn, m12 = (a - bb) * c * sn, m22 = a * sn * sn + bb * c * c;
+        const cs = Math.cos(spin), ss = Math.sin(spin);
+        const A = m11 * cs + m12 * ss, B = m12 * cs + m22 * ss, C = -m11 * ss + m12 * cs, D = -m12 * ss + m22 * cs;
+        p.el.style.transform = `translate(${(x - p.vx + p.ox).toFixed(1)}px, ${(y - p.vy + p.oy).toFixed(1)}px) matrix(${A.toFixed(4)}, ${B.toFixed(4)}, ${C.toFixed(4)}, ${D.toFixed(4)}, 0, 0)`;
+        // near the horizon: redshifted, dimmer, smeared, then gone
+        const near = clamp01(1 - (r - Rh) / (Rh * 2.5));
+        p.el.style.filter = near > 0.02 ? `sepia(${near.toFixed(2)}) saturate(${(1 + near * 2).toFixed(2)}) hue-rotate(${(-25 * near).toFixed(0)}deg) brightness(${(1 - near * 0.55).toFixed(2)}) blur(${(near * 2.5).toFixed(2)}px)` : "";
+        p.el.style.opacity = (1 - smooth(0.72, 1, tau)).toFixed(3);
       }
     };
     const restore = () => {
-      for (const a of anims) a.cancel();
-      anims = [];
-      for (const el of document.querySelectorAll<HTMLElement>(".ng-page > main, .ng-footer")) el.style.transformOrigin = "";
+      for (const p of pieces) for (const k of SAVED) p.el.style[k] = p.saved[k];
+      pieces = [];
+      for (const el of document.querySelectorAll<HTMLElement>(".ng-page > main, .ng-footer")) for (const a of el.getAnimations()) a.cancel();
     };
     const trigger = () => {
       if (phase !== "idle") return;
@@ -294,6 +331,7 @@ export function BlackHole() {
         rs += 0.1 * k * k;
         pull = 0.12 + 0.88 * k * k;
         collapse = smooth(1350, 1950, e);
+        if (!reset) fall(now, rs);
         if (e > RESET - 180 && !flash.current?.classList.contains("is-on")) {
           flash.current?.classList.add("is-on");
         }
