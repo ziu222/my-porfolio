@@ -6,9 +6,11 @@ import { ScrollScrub } from "@/components/scroll-scrub/scroll-scrub";
 import { readMotion, writeMotion, type MotionMode } from "@/lib/motion";
 import { scrollScrubScenes, scrollScrubTheme } from "@/scroll-scrub-scenes";
 
+import { BlackHole } from "./black-hole";
 import { ContactDust } from "./contact-dust";
 import { CrewBadge } from "./crew-badge";
 import { FactMeteors } from "./fact-meteors";
+import { GalaxyHero } from "./galaxy-hero";
 import { Loader } from "./loader";
 import { MusicPlayer } from "./music-player";
 import { NovaCompanion, novaCue } from "./nova-companion";
@@ -345,6 +347,7 @@ export function NghiaPage() {
 
       <main>
         <ScrollScrub key={`scrub-${epoch}`} scenes={scrollScrubScenes} theme={scrollScrubTheme} />
+        <GalaxyHero key={`galaxy-${epoch}`} />
         <div className="ng-horizon" aria-hidden="true"><span className="ng-horizon-glint" /></div>
 
         <section className="ng-section" id="projects" aria-labelledby="projects-title">
@@ -475,6 +478,7 @@ export function NghiaPage() {
           <a href="https://commons.wikimedia.org/wiki/File:Ghanaian_sign_language_interpreter_working_at_University_of_Education_Winneba.jpg" target="_blank" rel="noreferrer">sign language interpreter (CC BY-SA 4.0)</a>. Technology logos: Simple Icons.
         </p>
       </footer>
+      <BlackHole key={`hole-${epoch}`} />
     </div>
   );
 }
