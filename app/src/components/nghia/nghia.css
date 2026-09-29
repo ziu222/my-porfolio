@@ -220,6 +220,13 @@ html:not([data-motion]) .ng-w { opacity: 1; transform: none; filter: none; }
 .ng-map-nav ul button[aria-pressed="true"] span { opacity: 1; box-shadow: 0 0 8px rgba(var(--acc), 0.9); }
 .ng-map-step { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--ng-line); background: rgba(19, 17, 28, 0.9); color: var(--ng-star); cursor: pointer; transition: border-color 0.3s; }
 .ng-map-step:hover { border-color: var(--ng-rose); }
+@media (min-width: 861px) {
+  /* leave the corners to the record player (left) and Nova (right) */
+  .ng-map-nav { max-width: calc(100% - 220px); }
+  /* short screens: a slimmer screenshot, then none, so the panel clears the project index */
+  @media (max-height: 940px) { .ng-map-shot { aspect-ratio: 16 / 3.2; } }
+  @media (max-height: 800px) { .ng-map-shot { display: none; } }
+}
 
 @media (max-width: 860px) {
   .ng-map { height: 100dvh; }
@@ -462,6 +469,9 @@ html[data-motion="reduce"] .ng-term { animation: ng-fade 0.2s ease; }
 
 /* corner turntable: the intro's galaxy record, shrunk, with a queue that opens above it */
 .ng-player-dock { position: fixed; z-index: 38; left: 16px; bottom: 16px; display: grid; justify-items: start; gap: 10px; }
+/* mini: just the spinning record; hover or focus brings the rest back */
+.ng-player-dock[data-mini]:not(:hover, :focus-within) :is(.ng-player-meta, .ng-eq, .ng-player-icon, .ng-player-more) { display: none; }
+.ng-player-dock[data-mini]:not(:hover, :focus-within) .ng-deck { margin-right: 10px; }
 .ng-player {
   display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 8px; border-radius: 999px;
   border: 1px solid var(--ng-line); background: rgba(19, 17, 28, 0.94); box-shadow: 0 16px 40px -18px rgba(0, 0, 0, 0.9);
