@@ -57,6 +57,7 @@ const projects: Project[] = [
       { label: "Source code", href: "https://github.com/ziu222/Dishcover" },
     ],
     study: {
+      role: "Solo project, built end to end: backend, frontend, AI and infrastructure.",
       problem:
         "Recipe apps start from a dish and send you shopping. Dishcover works the other way round: it starts from what is already in your fridge and puts the ingredients that are about to expire first, to cut food waste.",
       built: [
@@ -85,9 +86,9 @@ const projects: Project[] = [
     short: "MedBook",
     category: "Team product",
     summary:
-      "A medical appointment booking platform for Military Hospital 175: find doctors by specialty, check open slots, book and pay through VNPAY, with automatic appointment reminders. I built the frontend in a team of three.",
+      "A medical appointment booking platform for Military Hospital 175: find doctors by specialty, check open slots, book and pay through VNPAY, with automatic appointment reminders. I led the project as PM in a team of three and worked on the frontend, backend and docs.",
     meta: [
-      { label: "Role", value: "Frontend Developer" },
+      { label: "Role", value: "PM, full-stack" },
       { label: "Team", value: "3 people" },
       { label: "Backend", value: "FastAPI on AWS Lambda" },
     ],
@@ -96,12 +97,14 @@ const projects: Project[] = [
     alt: "MedBook home page",
     links: [{ label: "Source code", href: "https://github.com/ziu222/medbook" }],
     study: {
-      role: "Frontend developer in a team of three; teammates owned the backend, infrastructure and docs.",
+      role: "Project manager in a team of three, and hands-on across the frontend, backend and documentation.",
       problem:
         "Patients at Military Hospital 175 needed to find a doctor by specialty, book an open slot and pay for it online, instead of calling or queuing at the counter.",
       built: [
-        "The whole web frontend in React, TypeScript and Vite: doctor search by specialty, slot booking, VNPAY checkout, cancellations and the patient account.",
-        "Wired it to the team's FastAPI backend on AWS Lambda, with sign-in handled by AWS Cognito rather than our own password code.",
+        "Ran the project as PM: scope, task breakdown and delivery for the Software Project Management course.",
+        "The web frontend in React, TypeScript and Vite: doctor search by specialty, slot booking, VNPAY checkout, cancellations and the patient account.",
+        "Work on the FastAPI backend on AWS Lambda, with modules for appointments, cancellations, doctors, users and VNPAY payments, and sign-in handled by AWS Cognito rather than our own password code.",
+        "The project documentation.",
       ],
       result: [
         "Built for the Software Project Management course.",
@@ -312,7 +315,7 @@ const stackGroups: (StackGroup & { desc: string })[] = [
 const journey = [
   { title: "HCMC Open University", text: "Computer Science, now in my final year." },
   { title: "MindX", text: "Full-stack Web course, building product skills." },
-  { title: "MedBook", text: "Frontend for a hospital appointment platform, in a team of three." },
+  { title: "MedBook", text: "Led a hospital appointment platform as PM, working across frontend, backend and docs." },
   { title: "Graduation project", status: "In progress", text: "Dishcover: 8 microservices, a RAG chatbot and Vision AI, live online." },
   { title: "SCTV", status: "Now", next: true, text: "Software Engineer Intern at Vietnam's leading cable TV and broadband network." },
 ];
