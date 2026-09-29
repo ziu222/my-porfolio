@@ -91,6 +91,14 @@
   50% { transform: scale(1.07); }
 }
 
+/* live WebGL galaxy in place of the film (galaxy-hero.tsx); the film layers stay in the DOM, hidden */
+.ng-galaxy-hero { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ng-page .scroll-scrub[data-galaxy] .scroll-scrub__media { visibility: hidden; }
+/* the copy's darkening scrim must fade out before its box edge, or the edge shows over the bright core */
+.ng-page .scroll-scrub[data-galaxy] .scroll-scrub__copy::before {
+  background: radial-gradient(closest-side, rgba(7, 6, 12, 0.82) 0%, rgba(7, 6, 12, 0.5) 55%, transparent 100%);
+}
+
 .ng-page .scroll-scrub__stage::after {
   content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
   background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(7, 6, 12, 0.55) 100%);
