@@ -269,6 +269,8 @@ export function NovaCompanion() {
     let lastY = window.scrollY, lastT = performance.now(), speed = 0;
     const onScroll = () => {
       const now = performance.now();
+      // a jump of several screens at once is a teleport (the black hole, an anchor), not a scroll
+      if (Math.abs(window.scrollY - lastY) > window.innerHeight * 2) { lastY = window.scrollY; lastT = now; speed = 0; return; }
       const v = Math.abs(window.scrollY - lastY) / Math.max(1, now - lastT) * 1000;
       lastY = window.scrollY; lastT = now;
       speed = speed * 0.6 + v * 0.4;

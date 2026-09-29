@@ -6,6 +6,7 @@ import { ScrollScrub } from "@/components/scroll-scrub/scroll-scrub";
 import { readMotion, writeMotion, type MotionMode } from "@/lib/motion";
 import { scrollScrubScenes, scrollScrubTheme } from "@/scroll-scrub-scenes";
 
+import { BlackHole } from "./black-hole";
 import { ContactDust } from "./contact-dust";
 import { CrewBadge } from "./crew-badge";
 import { FactMeteors } from "./fact-meteors";
@@ -475,6 +476,7 @@ export function NghiaPage() {
           <a href="https://commons.wikimedia.org/wiki/File:Ghanaian_sign_language_interpreter_working_at_University_of_Education_Winneba.jpg" target="_blank" rel="noreferrer">sign language interpreter (CC BY-SA 4.0)</a>. Technology logos: Simple Icons.
         </p>
       </footer>
+      <BlackHole key={`hole-${epoch}`} />
     </div>
   );
 }
