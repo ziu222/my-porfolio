@@ -58,6 +58,8 @@ export function Terminal({ projects, skills }: { projects: Project[]; skills: { 
 
   useEffect(() => {
     if (open) input.current?.focus();
+    // the site companion steps aside while Nova is in here
+    document.documentElement.toggleAttribute("data-term", open);
   }, [open]);
 
   useEffect(() => {

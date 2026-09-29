@@ -11,6 +11,7 @@ import { CrewBadge } from "./crew-badge";
 import { FactMeteors } from "./fact-meteors";
 import { Loader } from "./loader";
 import { MusicPlayer } from "./music-player";
+import { NovaCompanion, novaCue } from "./nova-companion";
 import { sparkBurst } from "./sparks";
 import { Terminal } from "./terminal";
 import { useHeroSnap } from "./use-hero-snap";
@@ -293,7 +294,11 @@ export function NghiaPage() {
   useReveal();
   useHeroSnap("#projects");
   const [active, setActive] = useState<StackGroupId | null>(null);
-  const [tech, setTech] = useState<string | null>(null);
+  const [tech, setTechState] = useState<string | null>(null);
+  const setTech = (t: string | null) => {
+    setTechState(t);
+    if (t) novaCue({ mood: "starry", say: `${t}. The glowing lines lead to the projects that use it.` });
+  };
   // null until mounted: the server can't know the visitor's preference
   const initialMotion = useSyncExternalStore(noSubscribe, readMotion, () => null);
   const [picked, setPicked] = useState<MotionMode | null>(null);
@@ -451,6 +456,7 @@ export function NghiaPage() {
 
       <FactMeteors enabled={motion === "full"} />
       <MusicPlayer />
+      <NovaCompanion />
       <Terminal projects={projects} skills={stackGroups} />
 
       <footer className="ng-footer">
