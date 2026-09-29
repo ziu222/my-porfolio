@@ -237,9 +237,9 @@ float fbm(vec2 p) {
 float pillars(vec2 uv, float seed) {
   // few, tall columns: the noise barely changes going up, a lot going across
   float cols = fbm(vec2(uv.x * 1.5 + seed, uv.y * 0.28 + seed * 0.3));
-  float rise = smoothstep(0.9, -1.0, uv.y);
+  float rise = (1.0 - smoothstep(-1.0, 0.9, uv.y));
   float m = smoothstep(0.55, 0.6, cols + rise * 0.62 - 0.36 + (fbm(uv * vec2(5.0, 9.0) + seed + vec2(uTime * 0.006, -uTime * 0.012)) - 0.5) * 0.12);
-  return m * smoothstep(1.0, 0.7, abs(uv.x)) * smoothstep(-1.0, -0.8, uv.y);
+  return m * (1.0 - smoothstep(0.7, 1.0, abs(uv.x))) * smoothstep(-1.0, -0.8, uv.y);
 }
 void main() {
   vec2 uv = vUv;
@@ -281,7 +281,7 @@ void main() {
     float r = length(uv);
     float a = atan(uv.y, uv.x);
     float rays = pow(noise(vec2(a * 7.0 + uTime * 0.04, uTime * 0.12)), 3.0) + pow(noise(vec2(a * 13.0 - uTime * 0.03, 5.0 + uTime * 0.09)), 4.0) * 0.6;
-    c = vTint * rays * exp(-r * 2.6) * smoothstep(0.02, 0.12, r) * smoothstep(1.0, 0.6, r);
+    c = vTint * rays * exp(-r * 2.6) * smoothstep(0.02, 0.12, r) * (1.0 - smoothstep(0.6, 1.0, r));
   }
   gl_FragColor = vec4(c * k, 1.0);
 }`;
