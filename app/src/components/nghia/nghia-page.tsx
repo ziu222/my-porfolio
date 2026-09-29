@@ -294,7 +294,7 @@ function useReveal() {
 
 export function NghiaPage() {
   useReveal();
-  useHeroSnap("#projects");
+  useHeroSnap("#projects", ".ng-map");
   const [active, setActive] = useState<StackGroupId | null>(null);
   const [tech, setTechState] = useState<string | null>(null);
   const setTech = (t: string | null) => {
