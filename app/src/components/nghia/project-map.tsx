@@ -1,6 +1,7 @@
-import { ArrowUpRight, CaretLeft, CaretRight, X } from "@phosphor-icons/react";
+import { ArrowRight, ArrowUpRight, CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { createPortal } from "react-dom";
 
 import { novaCue } from "./nova-companion";
 import { surface } from "./planet-surface";
@@ -20,6 +21,17 @@ export type Project = {
   img?: string;
   alt?: string;
   links?: { label: string; href: string }[];
+  /** The long read behind the panel: opened from its "Case study" button. */
+  study?: Study;
+};
+
+export type Study = {
+  role?: string;
+  problem: string;
+  built: string[];
+  result: string[];
+  /** Architecture as left-to-right layers; each layer's parts talk to the next layer's. */
+  arch?: { title: string; parts: string[] }[];
 };
 
 type Feature = "rings" | "moon" | "satellites";
@@ -328,7 +340,23 @@ export function ProjectMap({ projects }: { projects: Project[] }) {
     };
   }, [projects]);
 
-  const go = (i: number) => flyRef.current(i);
+  const [study, setStudy] = useState(-1);
+  const studyClose = useRef<HTMLButtonElement>(null);
+  const studyFrom = useRef<HTMLElement | null>(null);
+  const openStudy = (i: number, from: HTMLElement) => {
+    studyFrom.current = from;
+    setStudy(i);
+  };
+  const closeStudy = () => {
+    setStudy(-1);
+    studyFrom.current?.focus();
+  };
+  useEffect(() => {
+    if (study >= 0) studyClose.current?.focus();
+  }, [study]);
+  const shown = study >= 0 ? projects[study] : null;
+
+  const go = (i: number) => { setStudy(-1); flyRef.current(i); };
   const step = (d: number) => go(active < 0 ? (d > 0 ? 0 : projects.length - 1) : (active + d + projects.length) % projects.length);
 
   return (
@@ -336,9 +364,12 @@ export function ProjectMap({ projects }: { projects: Project[] }) {
       className="ng-map"
       ref={stage}
       data-open={active >= 0 ? "" : undefined}
+      data-study={study >= 0 ? "" : undefined}
       onKeyDown={(e) => {
+        if (study >= 0 && e.key !== "Escape") return;
         if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
         else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
+        else if (e.key === "Escape" && study >= 0) closeStudy();
         else if (e.key === "Escape" && active >= 0) go(-1);
       }}
     >
@@ -377,10 +408,16 @@ export function ProjectMap({ projects }: { projects: Project[] }) {
             {p.stack.slice(0, 6).map((t) => <li key={t}>{t}</li>)}
             {p.stack.length > 6 ? <li aria-label={`and ${p.stack.length - 6} more: ${p.stack.slice(6).join(", ")}`}>+{p.stack.length - 6}</li> : null}
           </ul>
-          {p.links ? (
+          {p.links || p.study ? (
             <div className="ng-case-links">
-              {p.links.map((l, li) => (
-                <a key={l.href} className={li === 0 ? "ng-cta ng-cta--rose" : "ng-cta ng-cta--ghost"} href={l.href} target="_blank" rel="noreferrer">
+              {p.study ? (
+                <button type="button" className="ng-cta ng-cta--rose" onClick={(e) => openStudy(i, e.currentTarget)}>
+                  Case study
+                  <ArrowRight size={16} weight="bold" aria-hidden="true" />
+                </button>
+              ) : null}
+              {p.links?.map((l, li) => (
+                <a key={l.href} className={li === 0 && !p.study ? "ng-cta ng-cta--rose" : "ng-cta ng-cta--ghost"} href={l.href} target="_blank" rel="noreferrer">
                   {l.label}
                   <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
                 </a>
@@ -389,6 +426,69 @@ export function ProjectMap({ projects }: { projects: Project[] }) {
           ) : null}
         </article>
       ))}
+
+      {/* portalled to the page root so it sits above the fixed nav, record player and Nova;
+          React still bubbles its events (Escape) through the map */}
+      {shown?.study ? createPortal(
+        <section
+          className="ng-study"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ng-study-title"
+          style={{ "--acc": BODIES[study]?.rgb ?? "255,122,147" } as CSSProperties}
+        >
+          <div className="ng-study-inner">
+            <header className="ng-study-head">
+              <div>
+                <p className="ng-map-cat">{shown.category}</p>
+                <h3 id="ng-study-title">{shown.title}</h3>
+                {shown.study.role ? <p className="ng-study-role">{shown.study.role}</p> : null}
+              </div>
+              <button type="button" className="ng-map-close" ref={studyClose} onClick={closeStudy} aria-label="Close the case study">
+                <X size={16} weight="bold" />
+              </button>
+            </header>
+            <div className="ng-study-grid">
+              <div className="ng-study-problem">
+                <h4>The problem</h4>
+                <p>{shown.study.problem}</p>
+              </div>
+              <div className="ng-study-built">
+                <h4>What I built</h4>
+                <ul>{shown.study.built.map((b) => <li key={b}>{b}</li>)}</ul>
+              </div>
+              <div className="ng-study-result">
+                <h4>Result</h4>
+                <ul>{shown.study.result.map((b) => <li key={b}>{b}</li>)}</ul>
+              </div>
+            </div>
+            {shown.study.arch ? (
+              <figure className="ng-arch">
+                <figcaption>Architecture</figcaption>
+                <ol>
+                  {shown.study.arch.map((layer) => (
+                    <li key={layer.title}>
+                      <span className="ng-arch-title">{layer.title}</span>
+                      <ul>{layer.parts.map((part) => <li key={part}>{part}</li>)}</ul>
+                    </li>
+                  ))}
+                </ol>
+              </figure>
+            ) : null}
+            {shown.links ? (
+              <div className="ng-case-links">
+                {shown.links.map((l, li) => (
+                  <a key={l.href} className={li === 0 ? "ng-cta ng-cta--rose" : "ng-cta ng-cta--ghost"} href={l.href} target="_blank" rel="noreferrer">
+                    {l.label}
+                    <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
+                  </a>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </section>,
+        document.querySelector(".ng-page") ?? document.body,
+      ) : null}
 
       <nav className="ng-map-nav" aria-label="Projects">
         <button type="button" className="ng-map-step" onClick={() => step(-1)} aria-label="Previous project">
