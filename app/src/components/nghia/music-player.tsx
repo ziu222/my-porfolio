@@ -44,6 +44,8 @@ export function MusicPlayer() {
   const current = useSyncExternalStore(ambient.subscribe, ambient.currentIndex, () => 0);
   const shuffle = useSyncExternalStore(ambient.subscribe, ambient.isShuffle, () => false);
   const [open, setOpen] = useState(false);
+  // folds down to just the record while the star map is on screen, so it covers none of it
+  const [mini, setMini] = useState(false);
   const bars = useRef<(HTMLSpanElement | null)[]>([]);
   const bar = useRef<HTMLSpanElement>(null);
   const dock = useRef<HTMLDivElement>(null);
@@ -71,6 +73,14 @@ export function MusicPlayer() {
     };
   }, [playing]);
 
+  useEffect(() => {
+    const map = document.querySelector(".ng-map");
+    if (!map) return;
+    const io = new IntersectionObserver(([e]) => setMini(e.isIntersecting), { threshold: 0.3 });
+    io.observe(map);
+    return () => io.disconnect();
+  }, []);
+
   // progress bar: polled only while the queue is open
   useEffect(() => {
     if (!open) return;
@@ -92,7 +102,7 @@ export function MusicPlayer() {
   }, [open]);
 
   return (
-    <div className="ng-player-dock" ref={dock} style={{ "--tint": track.tint } as CSSProperties}>
+    <div className="ng-player-dock" ref={dock} data-mini={mini && !open ? "" : undefined} style={{ "--tint": track.tint } as CSSProperties}>
       {open ? (
         <div className="ng-queue" role="region" aria-label="Soundtrack">
           <div className="ng-queue-now">

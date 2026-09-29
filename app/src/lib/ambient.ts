@@ -90,6 +90,41 @@ function impulse(c: AudioContext, seconds: number) {
   return buf;
 }
 
+// Needle drop: a soft thump as the stylus lands, then a few seconds of vinyl crackle fading out.
+// Scheduled on the context clock, so on a still-locked context it plays the moment audio unlocks.
+function needleDrop(c: AudioContext) {
+  const len = Math.floor(c.sampleRate * 3.2);
+  const buf = c.createBuffer(2, len, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      const pop = Math.random() < 0.0009 ? (Math.random() * 2 - 1) * 0.9 : 0;
+      data[i] = pop + (Math.random() * 2 - 1) * 0.012;
+    }
+  }
+  const at = c.currentTime + 0.02;
+  const crackle = c.createBufferSource();
+  crackle.buffer = buf;
+  const hp = c.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 900;
+  const cg = c.createGain();
+  cg.gain.setValueAtTime(VOLUME * 0.5, at);
+  cg.gain.exponentialRampToValueAtTime(0.0001, at + 3.1);
+  crackle.connect(hp).connect(cg).connect(c.destination);
+  crackle.start(at);
+
+  const thump = c.createOscillator();
+  thump.frequency.setValueAtTime(90, at);
+  thump.frequency.exponentialRampToValueAtTime(38, at + 0.18);
+  const tg = c.createGain();
+  tg.gain.setValueAtTime(VOLUME * 0.9, at);
+  tg.gain.exponentialRampToValueAtTime(0.0001, at + 0.22);
+  thump.connect(tg).connect(c.destination);
+  thump.start(at);
+  thump.stop(at + 0.25);
+}
+
 function build() {
   const c = new AudioContext();
   const out = c.createGain();
@@ -308,6 +343,7 @@ export const ambient = {
       master!.gain.cancelScheduledValues(now);
       master!.gain.setValueAtTime(master!.gain.value, now);
       master!.gain.linearRampToValueAtTime(VOLUME, now + 2.5);
+      needleDrop(ctx!);
       beginTrack();
     }
     void ctx!.resume().catch(() => {});

@@ -220,6 +220,13 @@ html:not([data-motion]) .ng-w { opacity: 1; transform: none; filter: none; }
 .ng-map-nav ul button[aria-pressed="true"] span { opacity: 1; box-shadow: 0 0 8px rgba(var(--acc), 0.9); }
 .ng-map-step { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--ng-line); background: rgba(19, 17, 28, 0.9); color: var(--ng-star); cursor: pointer; transition: border-color 0.3s; }
 .ng-map-step:hover { border-color: var(--ng-rose); }
+@media (min-width: 861px) {
+  /* leave the corners to the record player (left) and Nova (right) */
+  .ng-map-nav { max-width: calc(100% - 220px); }
+  /* short screens: a slimmer screenshot, then none, so the panel clears the project index */
+  @media (max-height: 940px) { .ng-map-shot { aspect-ratio: 16 / 3.2; } }
+  @media (max-height: 800px) { .ng-map-shot { display: none; } }
+}
 
 @media (max-width: 860px) {
   .ng-map { height: 100dvh; }
@@ -359,11 +366,18 @@ html:not([data-motion]) .ng-group .ng-tech li { opacity: 1; scale: 1; }
 @keyframes ng-iris { 70% { opacity: 1; } to { --ng-hole: 160vmax; opacity: 0; } }
 @keyframes ng-loader-out { to { opacity: 0; visibility: hidden; } }
 .ng-loader-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.ng-loader-ui { position: absolute; left: 16px; right: 16px; top: calc(44% + min(34vw, 30vh) * 1.07 + 22px); display: grid; justify-items: center; }
+.ng-loader-ui { position: absolute; left: 16px; right: 16px; top: calc(44% + min(31vw, 29vh) * 1.07 + 22px); display: grid; justify-items: center; }
 .ng-loader-pct { transition: opacity 0.45s ease, transform 0.6s var(--ng-ease); }
-.ng-loader-pct { font-family: var(--ng-display); font-weight: 700; font-size: clamp(1.8rem, 4vw, 2.6rem); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--ng-star); }
-.ng-loader-pct small { margin-left: 2px; font-size: 0.45em; font-weight: 500; color: var(--ng-muted); }
+.ng-loader-pct { font-family: var(--ng-display); font-weight: 300; font-size: 1rem; font-variant-numeric: tabular-nums; letter-spacing: 0.32em; padding-left: 0.32em; color: var(--ng-muted); }
+.ng-loader-pct small { margin-left: 0.1em; font-size: 0.8em; opacity: 0.7; }
 .ng-loader.is-entering .ng-loader-pct { opacity: 0; transform: translateY(-10px); }
+.ng-loader-ui { gap: 8px; }
+.ng-loader-log { font: 400 0.72rem/1 ui-monospace, "Cascadia Code", Consolas, monospace; letter-spacing: 0.06em; color: var(--ng-muted); opacity: 0.65; }
+.ng-loader-log::before { content: "› "; color: var(--ng-rose); }
+.ng-loader.is-entering .ng-loader-log { opacity: 1; color: var(--ng-star); }
+.ng-loader-nova { position: absolute; left: 0; top: 0; transform-origin: 30% 60%; will-change: transform; opacity: 0; }
+.ng-loader-nova .ng-nova { width: 100%; height: 100%; }
+.ng-loader.is-leaving .ng-loader-nova { pointer-events: none; }
 
 /* reduced motion: movement off, gentle cross-fades only */
 html[data-motion="reduce"] .ng-nav { animation: none; }
@@ -455,6 +469,9 @@ html[data-motion="reduce"] .ng-term { animation: ng-fade 0.2s ease; }
 
 /* corner turntable: the intro's galaxy record, shrunk, with a queue that opens above it */
 .ng-player-dock { position: fixed; z-index: 38; left: 16px; bottom: 16px; display: grid; justify-items: start; gap: 10px; }
+/* mini: just the spinning record; hover or focus brings the rest back */
+.ng-player-dock[data-mini]:not(:hover, :focus-within) :is(.ng-player-meta, .ng-eq, .ng-player-icon, .ng-player-more) { display: none; }
+.ng-player-dock[data-mini]:not(:hover, :focus-within) .ng-deck { margin-right: 10px; }
 .ng-player {
   display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 8px; border-radius: 999px;
   border: 1px solid var(--ng-line); background: rgba(19, 17, 28, 0.94); box-shadow: 0 16px 40px -18px rgba(0, 0, 0, 0.9);
@@ -656,4 +673,72 @@ html[data-motion="reduce"] .ng-badge-inner { transition: none; }
 .ng-nova-heart { position: absolute; top: 12%; width: 3px; height: 3px; color: var(--ng-rose); pointer-events: none; box-shadow: -3px -3px, 3px -3px, -3px 0, 0 0, 3px 0, 0 3px; animation: ng-nova-heart 1.2s steps(8) forwards; }
 @keyframes ng-nova-heart { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-34px); } }
 .ng-nova[data-reduce] .ng-nova-body, .ng-nova[data-reduce] .ng-nova-antenna { animation: none; }
+/* the new moods */
+.ng-nova[data-state="music"] .ng-nova-body { animation: none; } /* the beat drives it from JS */
+.ng-nova[data-state="surprised"] .ng-nova-body { animation: ng-nova-hop 0.3s steps(1) 1; }
+.ng-nova[data-state="starry"] .ng-nova-body { animation: ng-nova-hop 0.45s steps(1) 3; }
+.ng-nova[data-state="dizzy"] .ng-nova-body { animation: ng-nova-wobble 0.5s steps(4) infinite; transform-origin: 50% 90%; }
+@keyframes ng-nova-wobble { 0% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } 100% { transform: rotate(-9deg); } }
+.ng-nova[data-state="sad"] .ng-nova-body { animation: none; transform: translateY(1px); }
+.ng-nova[data-state="juggle"] .ng-nova-body, .ng-nova[data-state="sign"] .ng-nova-body { animation: ng-nova-breathe 0.8s steps(1) infinite; }
+.ng-nova-q { position: absolute; right: -4px; top: -6px; font: 700 14px ui-monospace, Consolas, monospace; color: var(--ng-rose); pointer-events: none; animation: ng-nova-q 0.9s steps(3) infinite alternate; }
+@keyframes ng-nova-q { to { transform: translateY(-4px); } }
+
+/* Nova out in the site: sits on the record player, flies to the crew pass and the contact CTAs */
+.ng-cmp { position: fixed; z-index: 39; left: 0; top: 0; width: 54px; height: 61px; opacity: 0; pointer-events: none; touch-action: none; transition: opacity 0.5s ease; will-change: transform; }
+.ng-cmp[data-on] { opacity: 1; pointer-events: auto; }
+.ng-cmp-body { position: relative; width: 100%; height: 100%; transform-origin: 50% 100%; }
+.ng-cmp .ng-nova { width: 100%; height: 100%; cursor: grab; transform: rotate(var(--tilt, 0deg)); }
+/* contact shadow: only while resting on something, right where the body meets it */
+.ng-cmp-shadow {
+  position: absolute; left: 20%; width: 60%; height: 7px; top: calc(100% - 4px); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0)); opacity: 0; transition: opacity 0.25s ease;
+}
+.ng-cmp:is([data-posture="stand"], [data-posture="sit"]) .ng-cmp-shadow { opacity: 1; }
+.ng-cmp[data-posture="sit"] .ng-cmp-shadow { top: calc(85% - 3px); left: 14%; width: 72%; }
+/* sitting: the shins swing in turn over the ledge */
+.ng-nova[data-posture="sit"] .ng-nova-leg { animation: ng-nova-kick 1.3s steps(1) infinite; }
+.ng-nova[data-posture="sit"] .ng-nova-leg[data-side="r"] { animation-delay: -0.65s; }
+@keyframes ng-nova-kick { 50% { transform: translateY(-1px); } }
+/* hanging: a slow sway from the hand on the strap */
+.ng-nova[data-posture="hang"] { transform-origin: 87% 50%; animation: ng-nova-sway 2.6s ease-in-out infinite; }
+@keyframes ng-nova-sway { 0%, 100% { rotate: -4deg; } 50% { rotate: 4deg; } }
+html[data-motion="reduce"] .ng-nova .ng-nova-leg, html[data-motion="reduce"] .ng-nova[data-posture="hang"] { animation: none; }
+.ng-cmp .ng-nova:active { cursor: grabbing; }
+html[data-term] .ng-cmp { opacity: 0; pointer-events: none; }
+.ng-cmp-bubble {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: min(220px, 70vw); padding: 7px 11px; border-radius: 10px;
+  font: 500 0.78rem/1.35 var(--ng-body); color: #1b1726; background: var(--ng-star);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); pointer-events: none;
+  animation: ng-cmp-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ng-cmp-bubble::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border: 5px solid transparent; border-top-color: var(--ng-star); }
+.ng-cmp[data-side="l"] .ng-cmp-bubble { left: 0; transform: none; }
+.ng-cmp[data-side="l"] .ng-cmp-bubble::after { left: 22px; }
+.ng-cmp[data-side="r"] .ng-cmp-bubble { left: auto; right: 0; transform: none; }
+.ng-cmp[data-side="r"] .ng-cmp-bubble::after { left: auto; right: 17px; }
+@keyframes ng-cmp-pop { from { opacity: 0; scale: 0.6; } }
+/* near the top edge the bubble hangs underneath instead */
+.ng-cmp[data-below] .ng-cmp-bubble { bottom: auto !important; top: calc(100% + 10px); }
+.ng-cmp[data-below] .ng-cmp-bubble::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: var(--ng-star); }
+/* lift the bubble clear of whatever Nova is holding overhead */
+.ng-cmp:has(.ng-cmp-sign) .ng-cmp-bubble { bottom: calc(100% + 30px); }
+.ng-cmp:has(.ng-cmp-juggle) .ng-cmp-bubble { bottom: calc(100% + 34px); }
+/* a little cardboard sign held overhead */
+.ng-cmp-sign {
+  position: absolute; bottom: 82%; left: 50%; translate: -50% 0; padding: 3px 8px; white-space: nowrap;
+  font: 700 0.72rem/1.2 ui-monospace, Consolas, monospace; color: #3a1a3f; background: #e9d9b8;
+  border: 2px solid #3a3550; border-radius: 3px; box-shadow: 2px 2px 0 #3a3550; pointer-events: none;
+  animation: ng-cmp-sign 1.2s steps(2) infinite;
+}
+@keyframes ng-cmp-sign { 50% { transform: translateY(-2px) rotate(-3deg); } }
+/* juggling: three tech logos looping over the head */
+.ng-cmp-juggle { position: absolute; left: 50%; bottom: 78%; width: 0; height: 0; pointer-events: none; }
+.ng-cmp-juggle img { position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; max-width: none; padding: 2px; border-radius: 50%; background: var(--ng-star); box-shadow: 0 0 6px rgba(255, 122, 147, 0.5); animation: ng-cmp-juggle 1.2s linear infinite; }
+@keyframes ng-cmp-juggle {
+  0% { transform: translate(-16px, 0); } 25% { transform: translate(-8px, -30px); } 50% { transform: translate(16px, 0); }
+  75% { transform: translate(8px, -22px); } 100% { transform: translate(-16px, 0); }
+}
+html[data-motion="reduce"] .ng-cmp-juggle img, html[data-motion="reduce"] .ng-cmp-sign, html[data-motion="reduce"] .ng-cmp-bubble { animation: none; }
 @media (max-width: 480px) { .ng-nova { width: 60px; height: 68px; } .ng-term-welcome { gap: 12px; } }

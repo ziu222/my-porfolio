@@ -2,6 +2,7 @@ import { ArrowUpRight, CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
+import { novaCue } from "./nova-companion";
 import { surface } from "./planet-surface";
 
 import { reducedMotion } from "@/lib/motion";
@@ -129,6 +130,7 @@ export function ProjectMap({ projects }: { projects: Project[] }) {
       const d = Math.hypot(camFor(i).x - from.x, camFor(i).y - from.y);
       dur = 900 + Math.min(d, 8) * 110;
       setActive(i);
+      if (i >= 0) novaCue({ mood: "starry", say: `${projects[i].short}, ${projects[i].category.toLowerCase()}. The details are in the panel.` });
       if (!raf) raf = requestAnimationFrame(frame);
     };
 
