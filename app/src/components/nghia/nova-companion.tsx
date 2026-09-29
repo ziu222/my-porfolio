@@ -167,6 +167,8 @@ export function NovaCompanion() {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       if (!shown) return;
+      // being swallowed by the black hole: its animation owns Nova until the page resets
+      if (root.hasAttribute("data-bh")) return;
       const nw = window.innerWidth < 640 ? 44 : 54, nh = Math.round((nw * 88) / 78);
       const W = window.innerWidth;
       let rest: NovaPosture = "float";
@@ -213,7 +215,7 @@ export function NovaCompanion() {
     raf = requestAnimationFrame(frame);
 
     // the guide: next tip for the current section, when Nova is free to talk
-    const settled = () => shown && !sad && !drag.active && mode === "home" && !returning && performance.now() > busyUntil;
+    const settled = () => shown && !sad && !root.hasAttribute("data-bh") && !drag.active && mode === "home" && !returning && performance.now() > busyUntil;
     const tip = (hello = false) => {
       const s = SECTIONS[sec];
       const n = told.get(s.id) ?? 0;
@@ -240,9 +242,10 @@ export function NovaCompanion() {
         if (e.isIntersecting) visible.add(e.target.id);
         else visible.delete(e.target.id);
       }
-      let next = 0;
+      // between sections (the footer, the black hole) Nova stays with the last one
+      let next = -1;
       SECTIONS.forEach((s, i) => { if (visible.has(s.id)) next = i; });
-      if (next === sec) return;
+      if (next < 0 || next === sec || root.hasAttribute("data-bh")) return;
       sec = next;
       setSection(next);
       if (shown && !told.has(SECTIONS[next].id) && !drag.active && mode === "home") tip(true);

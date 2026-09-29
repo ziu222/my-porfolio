@@ -4,23 +4,141 @@ import { reducedMotion } from "@/lib/motion";
 
 import { novaCue } from "./nova-companion";
 
-const TAU = Math.PI * 2;
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const smooth = (a: number, b: number, v: number) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
 
-// pieces of the page that get pulled in: section names, projects, the stack, the crew
-const WORDS = [
-  "Projects", "Skills", "About", "Contact", "Dishcover", "MedBook", "OptiLink", "Music Web", "CodeGym",
-  "DeepChessRL", "React", "TypeScript", "Spring Boot", "Kafka", "PostgreSQL", "Docker", "AWS", "Nova",
-  "SCTV", "33⅓ rpm", "Side A", "crew pass", "star map", "LinkedIn",
-];
+const VERT = `
+attribute vec2 aPos;
+varying vec2 vUv;
+void main() { vUv = aPos; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+// A Gargantua-style black hole, per pixel. Coordinates: screen centre at 0, half-height 1.
+// - Background: a procedural starfield and faint nebula, seen through a thin gravitational lens,
+//   so it bends around the hole and piles up into an Einstein ring; frame dragging swirls it.
+// - Accretion disk: thin, seen nearly edge-on; its near half crosses in front of the shadow, and
+//   the far half's image is lensed up and over the top (and a thinner one under the bottom).
+//   Sheared noise gives streaks of gas orbiting faster inside; the side coming at us is brighter
+//   and bluer (Doppler beaming).
+// - Shadow, a thin photon ring, and at the end a white hole that swells to fill the screen.
+const FRAG = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+varying vec2 vUv;
+uniform vec2 uRes;
+uniform float uTime, uRs, uPull, uCollapse, uFade, uPx;
+
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.02 + vec2(3.1, 1.7); a *= 0.5; }
+  return v;
+}
+// point stars on a jittered grid, two scales
+vec3 stars(vec2 p) {
+  vec3 c = vec3(0.0);
+  for (int l = 0; l < 2; l++) {
+    float sc = l == 0 ? 26.0 : 60.0;
+    vec2 g = p * sc, id = floor(g), f = fract(g) - 0.5;
+    float h = hash(id + float(l) * 17.0);
+    if (h > 0.78) {
+      vec2 o = vec2(hash(id + 3.1), hash(id + 7.7)) - 0.5;
+      float d = length(f - o * 0.7);
+      float b = (h - 0.78) / 0.22;
+      vec3 tint = mix(vec3(0.75, 0.84, 1.0), vec3(1.0, 0.86, 0.8), hash(id + 1.3));
+      float w0 = l == 0 ? 0.033 : 0.02;           // star radius in cell units
+      float w = max(w0, uPx * sc * 0.7);          // at least ~a pixel wide
+      c += tint * b * exp(-d * d / (w * w)) * (w0 * w0) / (w * w) * (l == 0 ? 1.6 : 0.9);
+    }
+  }
+  return c;
+}
+vec3 sky(vec2 p) {
+  float n = fbm(p * 1.4 + 4.0);
+  vec3 neb = mix(vec3(0.16, 0.05, 0.14), vec3(0.08, 0.05, 0.2), fbm(p * 2.3)) * smoothstep(0.45, 0.85, n) * 0.55;
+  return neb + stars(p);
+}
+// disk emission at disk radius dr and angle a (a = 0 toward the viewer's right)
+vec3 disk(float dr, float a, float rin, float rout) {
+  if (dr < rin || dr > rout) return vec3(0.0);
+  float x = (dr - rin) / (rout - rin);
+  // Keplerian-ish shear: inner gas laps the outer gas
+  float w = 0.9 / pow(dr / rin, 1.5);
+  float th = a - uTime * w;
+  vec2 q = vec2(cos(th), sin(th)) * dr / rin;
+  float gas = fbm(q * 3.2 + vec2(0.0, dr * 4.0)) * 0.7 + fbm(vec2(dr * 26.0 / rin, th * 2.0)) * 0.5;
+  float edge = smoothstep(0.0, 0.08, x) * (1.0 - smoothstep(0.55, 1.0, x));
+  // clamp first: at the rim x can round a hair past 1, and pow of a negative is NaN
+  float heat = pow(clamp(1.0 - x, 0.0, 1.0), 1.6);
+  vec3 col = mix(vec3(0.62, 0.12, 0.36), vec3(1.0, 0.48, 0.6), smoothstep(0.1, 0.6, heat));
+  col = mix(col, vec3(1.0, 0.93, 0.9), smoothstep(0.6, 1.0, heat));
+  // Doppler: the left side (sin a < 0 after our mapping) comes toward us
+  float beam = 1.0 + 0.75 * -cos(a);
+  col *= mix(vec3(1.0, 0.85, 0.8), vec3(0.85, 0.92, 1.1), clamp(-cos(a) * 0.5 + 0.5, 0.0, 1.0));
+  return col * (0.25 + gas * 1.1) * edge * (0.55 + heat * 1.8) * beam;
+}
+void main() {
+  vec2 uv = vUv * vec2(uRes.x / uRes.y, 1.0);
+  float r = length(uv);
+  float Rs = uRs;
+  vec3 c;
+  if (Rs > 0.001) {
+    // thin lens: the source position behind the hole, then frame dragging twists it
+    float thE = Rs * 1.35;
+    vec2 beta = uv * (1.0 - thE * thE / max(r * r, 1e-4));
+    float twist = uPull * 0.9 * Rs / max(length(beta), 0.05) + uTime * 0.01;
+    beta = mat2(cos(twist), -sin(twist), sin(twist), cos(twist)) * beta;
+    // magnification brightens the ring, capped
+    float mag = min(4.0, 1.0 / max(abs(1.0 - pow(thE / max(r, 1e-4), 4.0)), 0.05));
+    c = sky(beta * (1.0 + uPull * 0.6) + uTime * 0.004) * (0.6 + 0.4 * mag);
+    c *= smoothstep(Rs * 0.985, Rs * 1.015, r);
+
+    // the disk, tilted so we look at it from ~10 degrees above its plane
+    float incl = 0.17, rin = Rs * 1.55, rout = Rs * 4.4;
+    float dr = length(vec2(uv.x, uv.y / incl));
+    float a = atan(uv.y / incl, uv.x);
+    vec3 d = disk(dr, a, rin, rout);
+    // far half: behind the shadow, so hidden where it overlaps it, with soft edges
+    float nearW = (1.0 - smoothstep(-0.03 * Rs, 0.03 * Rs, uv.y));
+    float outside = smoothstep(Rs * 0.97, Rs * 1.03, r);
+    c += d * max(nearW, outside * 0.85);
+    // lensed image of the far side, arching over the top of the shadow
+    float arc = r;
+    float up = smoothstep(-0.25 * Rs, 0.35 * Rs, uv.y);
+    c += disk(mix(rin, rout, clamp((arc - Rs * 1.08) / (Rs * 1.1), 0.0, 1.0)), atan(uv.x, uv.y) * 1.6, rin, rout)
+         * up * smoothstep(Rs * 1.02, Rs * 1.12, r) * (1.0 - smoothstep(Rs * 1.7, Rs * 2.4, r)) * 0.75;
+    // and a thinner one hugging the bottom
+    float down = (1.0 - smoothstep(-0.5 * Rs, 0.2 * Rs, uv.y));
+    c += disk(mix(rin, rout, clamp((r - Rs * 1.04) / (Rs * 0.45), 0.0, 1.0)), atan(-uv.x, -uv.y) * 1.6, rin, rout)
+         * down * smoothstep(Rs * 1.01, Rs * 1.06, r) * (1.0 - smoothstep(Rs * 1.18, Rs * 1.5, r)) * 0.45;
+    // photon ring
+    c += vec3(1.0, 0.86, 0.9) * exp(-abs(r - Rs * 1.035) / (Rs * 0.012)) * 0.9;
+    c += vec3(1.0, 0.5, 0.65) * exp(-abs(r - Rs * 1.06) / (Rs * 0.06)) * 0.12;
+  } else {
+    c = sky(uv);
+  }
+  // white hole: a point of light swelling until it fills the screen
+  float wr = 0.03 + pow(uCollapse, 2.2) * 2.4;
+  c += (vec3(1.0, 0.97, 0.98) * exp(-r / (wr * 0.25)) * 1.4 + vec3(1.0, 0.7, 0.8) * exp(-r / wr) * 0.7) * smoothstep(0.0, 0.2, uCollapse);
+  // filmic shoulder so the hottest gas rolls off instead of clipping
+  c = c / (1.0 + c * 0.35);
+  gl_FragColor = vec4(c * uFade, 1.0);
+}`;
 
 /**
- * The end of the page is a black hole. Scrolling past the footer walks into it: it opens up with
- * a tilted accretion disk and a photon ring, bends the stars behind it, and pulls the page in, its
- * words spiralling down and stretching as they fall. At the bottom it collapses into a white flash
- * and the visitor comes out at the top of the page again. Everything is driven by scroll, so it
- * runs backwards just as well. Absent with motion off.
+ * The end of the page is a black hole, rendered per pixel like Gargantua: stars lensed into an
+ * Einstein ring, a thin accretion disk wrapped over and under the shadow, Doppler-bright on one
+ * side, a photon ring. It sits below the footer, turning. Nova points it out; one more scroll
+ * from the bottom of the page sets it off: the page, the navigation, the record player and Nova
+ * spiral into it, it collapses into a white hole, and the visitor comes out at the top of the
+ * page. A timed sequence, not scroll-scrubbed. Absent with motion off.
  */
 export function BlackHole() {
   const wrap = useRef<HTMLElement>(null);
@@ -31,211 +149,207 @@ export function BlackHole() {
     if (reducedMotion()) return;
     const section = wrap.current!;
     const canvas = canvasRef.current!;
-    const ctx = canvas.getContext("2d")!;
-    let W = 0, H = 0, raf = 0, visible = false, last = performance.now();
+    const gl = canvas.getContext("webgl", { antialias: false, alpha: false });
+    if (!gl) { section.hidden = true; return; }
 
+    const compile = (type: number, src: string) => {
+      const s = gl.createShader(type)!;
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.warn("black hole shader:", gl.getShaderInfoLog(s));
+      return s;
+    };
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, "aPos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const u = (n: string) => gl.getUniformLocation(prog, n);
+    const U = { res: u("uRes"), time: u("uTime"), rs: u("uRs"), pull: u("uPull"), collapse: u("uCollapse"), fade: u("uFade"), px: u("uPx") };
+
+    // per-pixel lensing is the costly part: render below device resolution and let CSS scale it up
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-      W = canvas.clientWidth; H = canvas.clientHeight;
-      canvas.width = W * dpr; canvas.height = H * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const scale = Math.min(window.devicePixelRatio || 1, 1.5) * 0.7;
+      canvas.width = Math.round(canvas.clientWidth * scale);
+      canvas.height = Math.round(canvas.clientHeight * scale);
+      gl.viewport(0, 0, canvas.width, canvas.height);
     };
-    resize();
 
-    // stars keep their own angle (they orbit over time); how far they have fallen comes from scroll
-    const stars = Array.from({ length: 520 }, () => ({
-      r0: 0.08 + Math.random() ** 0.7 * 1.1, th: Math.random() * TAU, s: 0.4 + Math.random() * 1.3,
-      o: 0.25 + Math.random() * 0.6, fall: 0.55 + Math.random() * 0.45,
-    }));
-    const words = WORDS.map((w, i) => ({
-      w, r0: 0.45 + Math.random() * 0.6, th: (i / WORDS.length) * TAU + Math.random() * 0.4,
-      size: 12 + Math.random() * 10, fall: 0.8 + Math.random() * 0.2, delay: Math.random() * 0.25,
-    }));
-    const sparks = Array.from({ length: 90 }, () => ({ a: Math.random() * TAU, r: 1.5 + Math.random() * 1.7, v: 0.6 + Math.random() }));
-
-    let said = 0, teleported = false;
-    const progress = () => {
+    const root = document.documentElement;
+    const atBottom = () => {
       const r = section.getBoundingClientRect();
-      return clamp01(-r.top / Math.max(1, r.height - window.innerHeight));
+      return r.top < window.innerHeight * 0.55 && window.scrollY + window.innerHeight >= root.scrollHeight - 4;
     };
 
+    // ---- the swallow: everything on screen spirals into the hole ----
+    const SUCK = 1900, RESET = 1950, DONE = 2600;
+    let phase: "idle" | "suck" = "idle", suckAt = 0, reset = false;
+    let anims: Animation[] = [];
+    const inward = [0.55, 0, 0.9, 0.35].join(", ");
+    const swallow = () => {
+      const r = section.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      // the page itself turns around the hole and shrinks into it
+      for (const el of document.querySelectorAll<HTMLElement>(".ng-page > main, .ng-footer")) {
+        const b = el.getBoundingClientRect();
+        el.style.transformOrigin = `${cx - b.left}px ${cy - b.top}px`;
+        anims.push(el.animate(
+          [
+            { transform: "none", filter: "none", opacity: 1 },
+            { transform: "rotate(160deg) scale(0.62)", filter: "blur(1px)", opacity: 0.9, offset: 0.55 },
+            { transform: "rotate(560deg) scale(0)", filter: "blur(6px)", opacity: 0 },
+          ],
+          { duration: SUCK, easing: `cubic-bezier(${inward})`, fill: "forwards" },
+        ));
+      }
+      // the fixed pieces fly in on their own spirals: navigation, record player, Nova
+      const loose: [string, number][] = [[".ng-nav", 0], [".ng-player-dock", 90], [".ng-cmp", 160]];
+      for (const [sel, delay] of loose) {
+        const el = document.querySelector<HTMLElement>(sel);
+        if (!el) continue;
+        const b = el.getBoundingClientRect();
+        const dx = cx - (b.left + b.width / 2), dy = cy - (b.top + b.height / 2);
+        // Nova (with its speech bubble) tumbles more than the rest; its position is an inline
+        // transform, so the animation is composited on top of it rather than replacing it
+        const nova = sel === ".ng-cmp";
+        const turn = nova ? 1080 : 540;
+        anims.push(el.animate(
+          [
+            { transform: "translate(0, 0) rotate(0deg) scale(1)", opacity: 1 },
+            // swing out a little first, then fall in: a curve, not a straight line
+            { transform: `translate(${(dx * 0.35 - dy * 0.25).toFixed(0)}px, ${(dy * 0.35 + dx * 0.25).toFixed(0)}px) rotate(${turn * 0.35}deg) scale(0.75)`, opacity: 1, offset: 0.5 },
+            { transform: `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) rotate(${turn}deg) scale(0)`, opacity: 0 },
+          ],
+          { duration: SUCK - delay, delay, easing: `cubic-bezier(${inward})`, fill: "forwards", composite: nova ? "add" : "replace" },
+        ));
+      }
+    };
+    const restore = () => {
+      for (const a of anims) a.cancel();
+      anims = [];
+      for (const el of document.querySelectorAll<HTMLElement>(".ng-page > main, .ng-footer")) el.style.transformOrigin = "";
+    };
+    const trigger = () => {
+      if (phase !== "idle") return;
+      phase = "suck";
+      suckAt = performance.now();
+      reset = false;
+      root.style.overflow = "hidden";
+      root.setAttribute("data-bh", "");
+      novaCue({ mood: "dizzy", say: "Here we go! It's pulling us in!", ms: 2000 });
+      swallow();
+      if (!raf) raf = requestAnimationFrame(frame);
+    };
+
+    // ---- one scroll from the bottom sets it off ----
+    // a new gesture only: momentum from the scroll that reached the bottom must not count
+    let bottomSince = 0, lastWheel = 0, touchY: number | null = null, hinted = -Infinity;
+    const ready = () => phase === "idle" && atBottom() && bottomSince > 0 && performance.now() - bottomSince > 350;
+    const onWheel = (e: WheelEvent) => {
+      const now = performance.now();
+      const fresh = now - lastWheel > 220;
+      lastWheel = now;
+      if (e.deltaY > 0 && fresh && ready()) trigger();
+    };
+    const onTouchStart = (e: TouchEvent) => { touchY = e.touches[0]?.clientY ?? null; };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (touchY === null) return;
+      const dy = touchY - (e.changedTouches[0]?.clientY ?? touchY);
+      touchY = null;
+      if (dy > 40 && ready()) trigger();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).closest("input, textarea, [contenteditable], [role='dialog']")) return;
+      if (["ArrowDown", "PageDown", "End"].includes(e.key) || (e.key === " " && !e.shiftKey)) if (ready()) trigger();
+    };
+
+    let raf = 0, visible = false, cw = 0, ch = 0;
+    const t0 = performance.now();
     const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      const p = progress();
-      const cx = W / 2, cy = H / 2, half = Math.hypot(W, H) / 2, m = Math.min(W, H);
-      const grow = smooth(0.02, 0.7, p);
-      const collapse = smooth(0.86, 0.97, p);
-      const Rs = m * (0.025 + 0.13 * grow) * (1 - collapse);
-      const pull = smooth(0.12, 0.84, p);
+      raf = 0;
+      if (canvas.clientWidth !== cw || canvas.clientHeight !== ch) { cw = canvas.clientWidth; ch = canvas.clientHeight; resize(); }
+      const r = section.getBoundingClientRect(), H = window.innerHeight;
 
-      ctx.fillStyle = "#07060c";
-      ctx.fillRect(0, 0, W, H);
-
-      // stars: spiral in, faster near the hole, and are lensed outward around its edge
-      for (const s of stars) {
-        const r = s.r0 * half * (1 - pull * s.fall * 0.97);
-        const spin = 0.03 + 2.2 * Math.pow(Rs / Math.max(r, Rs), 1.5) * (0.3 + pull);
-        s.th += spin * dt;
-        if (r < Rs * 1.02) continue; // gone over the horizon
-        const rl = r + (Rs * Rs * 1.5) / Math.max(r, Rs);
-        const x = cx + Math.cos(s.th) * rl, y = cy + Math.sin(s.th) * rl;
-        const streak = Math.min(40, spin * rl * 0.09);
-        ctx.strokeStyle = `rgba(244,239,230,${(s.o * (0.4 + 0.6 * Math.min(1, streak / 6 + 0.4))).toFixed(3)})`;
-        ctx.lineWidth = s.s;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + Math.sin(s.th) * streak, y - Math.cos(s.th) * streak);
-        ctx.stroke();
+      // waiting at the bottom: Nova points the way, now and then
+      if (phase === "idle") {
+        if (atBottom()) {
+          if (!bottomSince) bottomSince = now;
+          if (now - bottomSince > 700 && now - hinted > 14000) {
+            hinted = now;
+            novaCue({ mood: "point", say: "Scroll once more to jump into the black hole.", ms: 4200 });
+          }
+        } else bottomSince = 0;
       }
 
-      // the page itself: its words fall in, stretching along the fall (spaghettification)
-      const wordsIn = smooth(0.08, 0.22, p);
-      if (wordsIn > 0) {
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        for (const w of words) {
-          const f = clamp01((pull - w.delay) / (1 - w.delay));
-          const r = w.r0 * half * (1 - f * w.fall);
-          w.th += (0.05 + 1.6 * Math.pow(Rs / Math.max(r, Rs), 1.4)) * dt;
-          if (r < Rs * 1.1) continue;
-          const x = cx + Math.cos(w.th) * r, y = cy + Math.sin(w.th) * r;
-          const near = clamp01(1 - (r - Rs) / (Rs * 5));
-          ctx.save();
-          ctx.translate(x, y);
-          ctx.rotate(w.th);
-          ctx.scale(1 + near * 2.2, Math.max(0.15, 1 - near * 0.8));
-          ctx.rotate(Math.PI / 2);
-          ctx.globalAlpha = wordsIn * (0.75 - near * 0.4);
-          ctx.fillStyle = near > 0.4 ? "#ffd6de" : "#f4efe6";
-          ctx.font = `600 ${w.size * (1 - near * 0.4)}px "Bricolage Grotesque", system-ui, sans-serif`;
-          ctx.fillText(w.w, 0, 0);
-          ctx.restore();
+      let rs = 0.22 + 0.012 * Math.sin((now - t0) / 1400), pull = 0.12, collapse = 0;
+      if (phase === "suck") {
+        const e = now - suckAt;
+        const k = clamp01(e / 1500);
+        rs += 0.1 * k * k;
+        pull = 0.12 + 0.88 * k * k;
+        collapse = smooth(1350, 1950, e);
+        if (e > RESET - 180 && !flash.current?.classList.contains("is-on")) {
+          flash.current?.classList.add("is-on");
         }
-        ctx.globalAlpha = 1;
-      }
-
-      if (Rs > 0.5) {
-        const tilt = -0.18;
-        // the shadow is drawn in two halves split along the disk's axis: the near half first, so
-        // the disk passes in front of it, the far half last, so it hides the disk behind the hole
-        const shadowHalf = (far: boolean) => {
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate(tilt);
-          ctx.beginPath();
-          ctx.rect(-Rs * 1.1, far ? -Rs * 1.1 : 0, Rs * 2.2, Rs * 1.1);
-          ctx.clip();
-          ctx.fillStyle = "#000";
-          ctx.beginPath(); ctx.arc(0, 0, Rs, 0, TAU); ctx.fill();
-          ctx.restore();
-        };
-        shadowHalf(false);
-
-        const glow = ctx.createRadialGradient(cx, cy, Rs, cx, cy, Rs * 3.6);
-        glow.addColorStop(0, "rgba(255,214,222,0.95)");
-        glow.addColorStop(0.35, "rgba(255,122,147,0.7)");
-        glow.addColorStop(0.7, "rgba(150,90,210,0.35)");
-        glow.addColorStop(1, "rgba(120,90,200,0)");
-        // the disk's image lensed up and over the hole, fading out toward its ends
-        const archFade = ctx.createLinearGradient(cx - Rs * 1.7, 0, cx + Rs * 1.7, 0);
-        archFade.addColorStop(0, "rgba(255,122,147,0)");
-        archFade.addColorStop(0.25, "rgba(255,170,190,0.75)");
-        archFade.addColorStop(0.5, "rgba(255,214,222,0.85)");
-        archFade.addColorStop(0.75, "rgba(255,170,190,0.75)");
-        archFade.addColorStop(1, "rgba(255,122,147,0)");
-        ctx.strokeStyle = archFade;
-        ctx.lineWidth = Rs * 0.26;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy - Rs * 0.05, Rs * 1.55, Rs * 1.35, 0, Math.PI, TAU);
-        ctx.stroke();
-        ctx.strokeStyle = glow;
-        // accretion disk: soft bands, then thin streams of gas turning around the hole
-        for (const [k, a] of [[3.4, 0.35], [2.6, 0.55], [1.9, 0.9]] as const) {
-          ctx.globalAlpha = a;
-          ctx.lineWidth = Rs * 0.55;
-          ctx.beginPath(); ctx.ellipse(cx, cy, Rs * k, Rs * k * 0.26, tilt, 0, TAU); ctx.stroke();
+        // hidden behind the flash: put the page back, at the top
+        if (e > RESET && !reset) {
+          reset = true;
+          restore();
+          root.style.overflow = "";
+          root.removeAttribute("data-bh");
+          window.scrollTo({ top: 0, behavior: "instant" });
+          window.setTimeout(() => novaCue({ mood: "happy", say: "Through the black hole and back to the start. Another lap?" }), 700);
         }
-        ctx.lineWidth = Math.max(0.6, Rs * 0.02);
-        for (let i = 0; i < 12; i++) {
-          const k = 1.45 + i * 0.19;
-          ctx.globalAlpha = 0.25 + 0.35 * ((i * 37) % 10) / 10;
-          ctx.strokeStyle = i % 3 ? "rgba(255,230,236,0.9)" : "rgba(255,160,180,0.9)";
-          ctx.setLineDash([Rs * (0.3 + (i % 4) * 0.25), Rs * (0.2 + (i % 3) * 0.3)]);
-          ctx.lineDashOffset = -now * 0.02 * (Rs / 60) / k;
-          ctx.beginPath(); ctx.ellipse(cx, cy, Rs * k, Rs * k * 0.26, tilt, 0, TAU); ctx.stroke();
-        }
-        ctx.setLineDash([]);
-        ctx.globalAlpha = 1;
-
-        shadowHalf(true);
-        ctx.strokeStyle = "rgba(255,230,236,0.9)";
-        ctx.lineWidth = Math.max(1, Rs * 0.04);
-        ctx.beginPath(); ctx.arc(cx, cy, Rs * 1.04, 0, TAU); ctx.stroke();
-        // hot clumps orbiting in the disk
-        for (const s of sparks) {
-          s.a += s.v * dt * (1.4 / s.r) * (0.6 + pull);
-          const ex = Math.cos(s.a) * Rs * s.r, ey = Math.sin(s.a) * Rs * s.r * 0.26;
-          const x = cx + ex * Math.cos(tilt) - ey * Math.sin(tilt), y = cy + ex * Math.sin(tilt) + ey * Math.cos(tilt);
-          if (Math.sin(s.a) < 0 && Math.hypot(x - cx, y - cy) < Rs) continue; // hidden behind the shadow
-          const doppler = 0.35 + 0.65 * (0.5 - 0.5 * Math.cos(s.a));
-          ctx.fillStyle = `rgba(255,236,240,${doppler.toFixed(3)})`;
-          ctx.fillRect(x, y, 2, 2);
+        if (e > DONE) {
+          phase = "idle";
+          flash.current?.classList.remove("is-on");
+          bottomSince = 0;
         }
       }
+      gl.uniform2f(U.res, canvas.width, canvas.height);
+      gl.uniform1f(U.px, 2 / Math.max(1, canvas.height));
+      gl.uniform1f(U.time, (now - t0) / 1000);
+      gl.uniform1f(U.rs, rs * (1 - collapse));
+      gl.uniform1f(U.pull, pull);
+      gl.uniform1f(U.collapse, collapse);
+      gl.uniform1f(U.fade, 0.35 + 0.65 * clamp01((H - r.top) / H));
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-      // collapse: the hole pinches shut and turns inside out into a white hole, a point of light
-      // that swells until it fills the screen
-      if (collapse > 0) {
-        const wr = m * (0.03 + Math.pow(collapse, 2.4) * 1.3);
-        ctx.globalCompositeOperation = "lighter";
-        const white = ctx.createRadialGradient(cx, cy, 0, cx, cy, wr);
-        white.addColorStop(0, "rgba(255,255,255,1)");
-        white.addColorStop(0.25, `rgba(255,236,240,${(0.6 + collapse * 0.4).toFixed(3)})`);
-        white.addColorStop(0.6, `rgba(255,150,175,${(collapse * 0.5).toFixed(3)})`);
-        white.addColorStop(1, "rgba(255,122,147,0)");
-        ctx.fillStyle = white;
-        ctx.beginPath(); ctx.arc(cx, cy, wr, 0, TAU); ctx.fill();
-        ctx.globalCompositeOperation = "source-over";
-      }
-
-      // Nova narrates the fall
-      if (p > 0.2 && said < 1) { said = 1; novaCue({ mood: "surprised", say: "That's a black hole. Keep scrolling if you're brave." }); }
-      if (p > 0.62 && said < 2) { said = 2; novaCue({ mood: "dizzy", say: "It's pulling the whole page in!" }); }
-
-      // out the other side: back at the top of the page
-      if (p > 0.985 && !teleported) {
-        teleported = true;
-        flash.current?.classList.remove("is-on");
-        void flash.current?.offsetWidth;
-        flash.current?.classList.add("is-on");
-        window.scrollTo({ top: 0, behavior: "instant" });
-        window.setTimeout(() => novaCue({ mood: "happy", say: "Through the black hole and back to the start. Another lap?" }), 900);
-      }
-      if (p < 0.5) { teleported = false; if (p < 0.1) said = 0; }
-
-      raf = visible ? requestAnimationFrame(frame) : 0;
+      if (visible || phase === "suck") raf = requestAnimationFrame(frame);
     };
 
     const io = new IntersectionObserver(([e]) => {
       visible = e.isIntersecting;
-      if (visible && !raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
+      if (visible && !raf) raf = requestAnimationFrame(frame);
     });
     io.observe(section);
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.addEventListener("keydown", onKey);
     return () => {
       cancelAnimationFrame(raf);
       io.disconnect();
-      ro.disconnect();
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("keydown", onKey);
+      restore();
+      if (phase === "suck") root.style.overflow = "";
+      root.removeAttribute("data-bh");
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
   }, []);
 
   return (
-    <section className="ng-bh" ref={wrap} aria-label="The end of the page: a black hole that leads back to the top">
-      <div className="ng-bh-stage">
-        <canvas ref={canvasRef} className="ng-bh-canvas" aria-hidden="true" />
-      </div>
+    <section className="ng-bh" ref={wrap} aria-label="The end of the page: a black hole. Scroll once more to jump in and return to the top">
+      <canvas ref={canvasRef} className="ng-bh-canvas" aria-hidden="true" />
       <div className="ng-bh-flash" ref={flash} aria-hidden="true" />
     </section>
   );
