@@ -56,6 +56,29 @@ const projects: Project[] = [
       { label: "Live demo", href: "https://www.dishcover.online" },
       { label: "Source code", href: "https://github.com/ziu222/Dishcover" },
     ],
+    study: {
+      role: "Solo project, built end to end: backend, frontend, AI and infrastructure.",
+      problem:
+        "Recipe apps start from a dish and send you shopping. Dishcover works the other way round: it starts from what is already in your fridge and puts the ingredients that are about to expire first, to cut food waste.",
+      built: [
+        "Eight Spring Boot services behind a Spring Cloud Gateway with central JWT checks, one database schema per service, and Kafka only where it pays off: expiry alerts.",
+        "A matching engine that ranks 153 seeded recipes through six scoring rules: ingredient overlap, essential-ingredient weight, an expiry bonus, calorie goal, dietary tags and a hard allergy filter.",
+        "A Vietnamese RAG chatbot with four-step hybrid retrieval (ingredients, dish name, category, then pgvector search) that only ever suggests recipes that exist in the database.",
+        "Vision AI ingredient recognition with a confirm step before anything is saved, and circuit breakers with useful fallbacks on every AI call, so a failing model never leaves a blank screen.",
+      ],
+      result: [
+        "Live at dishcover.online on AWS ECS Fargate, RDS and CloudFront, all managed with Terraform.",
+        "Ten screens, from sign-up with an email OTP to the chatbot.",
+        "The infrastructure can be switched off between demos without losing data.",
+      ],
+      arch: [
+        { title: "Client", parts: ["React + TypeScript SPA", "S3 + CloudFront"] },
+        { title: "Edge", parts: ["Spring Cloud Gateway", "JWT auth"] },
+        { title: "Services", parts: ["User", "Inventory", "Recipe", "Matching", "RAG chatbot", "Image recognition", "Notification"] },
+        { title: "Data", parts: ["PostgreSQL + pgvector", "MongoDB", "Kafka"] },
+        { title: "External", parts: ["LLM + embeddings", "OpenAI Vision", "Cloudinary", "SMTP email"] },
+      ],
+    },
   },
   {
     id: "medbook",
@@ -63,9 +86,9 @@ const projects: Project[] = [
     short: "MedBook",
     category: "Team product",
     summary:
-      "A medical appointment booking platform for Military Hospital 175: find doctors by specialty, check open slots, book and pay through VNPAY, with automatic appointment reminders. I built the frontend in a team of three.",
+      "A medical appointment booking platform for Military Hospital 175: find doctors by specialty, check open slots, book and pay through VNPAY, with automatic appointment reminders. I led the project as PM in a team of three and worked on the frontend, backend and docs.",
     meta: [
-      { label: "Role", value: "Frontend Developer" },
+      { label: "Role", value: "PM, full-stack" },
       { label: "Team", value: "3 people" },
       { label: "Backend", value: "FastAPI on AWS Lambda" },
     ],
@@ -73,6 +96,27 @@ const projects: Project[] = [
     img: "/assets/img/shot-medbook.webp",
     alt: "MedBook home page",
     links: [{ label: "Source code", href: "https://github.com/ziu222/medbook" }],
+    study: {
+      role: "Project manager in a team of three, and hands-on across the frontend, backend and documentation.",
+      problem:
+        "Patients at Military Hospital 175 needed to find a doctor by specialty, book an open slot and pay for it online, instead of calling or queuing at the counter.",
+      built: [
+        "Ran the project as PM: scope, task breakdown and delivery for the Software Project Management course.",
+        "The web frontend in React, TypeScript and Vite: doctor search by specialty, slot booking, VNPAY checkout, cancellations and the patient account.",
+        "Work on the FastAPI backend on AWS Lambda, with modules for appointments, cancellations, doctors, users and VNPAY payments, and sign-in handled by AWS Cognito rather than our own password code.",
+        "The project documentation.",
+      ],
+      result: [
+        "Built for the Software Project Management course.",
+        "Fully serverless on AWS: API Gateway, Lambda, RDS PostgreSQL, Cognito, and SES with EventBridge for automatic reminders, all in Terraform.",
+      ],
+      arch: [
+        { title: "Client", parts: ["React + TypeScript SPA"] },
+        { title: "API", parts: ["API Gateway", "FastAPI on Lambda"] },
+        { title: "Data and auth", parts: ["RDS PostgreSQL", "AWS Cognito"] },
+        { title: "Services", parts: ["VNPAY payments", "SES + EventBridge reminders"] },
+      ],
+    },
   },
   {
     id: "optilink",
@@ -110,6 +154,24 @@ const projects: Project[] = [
     img: "/assets/img/photo-music.webp",
     alt: "A hand placing a turntable needle on a vinyl record",
     links: [{ label: "Source code", href: "https://github.com/ziu222/react-music-web" }],
+    study: {
+      role: "Sole developer.",
+      problem:
+        "A Spotify-style product with three kinds of user, listeners, artists and admins, each with their own workspace, without running a backend server of its own.",
+      built: [
+        "The listener app: a persistent player with queue, shuffle, repeat and lyrics; a library of liked songs, playlists, albums and follows; and back and forward history across pages.",
+        "An Artist Studio for submitting songs, saving drafts and reading analytics, and an Admin Console for reviewing submissions, moderating the catalog, broadcasting notifications and auditing changes.",
+        "Supabase for auth, storage and realtime updates, with a localStorage-first mode so the whole UI keeps working without a connection.",
+      ],
+      result: [
+        "Runs with or without a Supabase project behind it.",
+        "End-to-end tests with Playwright for the listener, artist and admin roles.",
+      ],
+      arch: [
+        { title: "Client", parts: ["React 19 + Vite", "localStorage cache"] },
+        { title: "Supabase", parts: ["Auth", "PostgreSQL + RLS", "Storage", "Realtime"] },
+      ],
+    },
   },
   {
     id: "codegym",
@@ -253,7 +315,7 @@ const stackGroups: (StackGroup & { desc: string })[] = [
 const journey = [
   { title: "HCMC Open University", text: "Computer Science, now in my final year." },
   { title: "MindX", text: "Full-stack Web course, building product skills." },
-  { title: "MedBook", text: "Frontend for a hospital appointment platform, in a team of three." },
+  { title: "MedBook", text: "Led a hospital appointment platform as PM, working across frontend, backend and docs." },
   { title: "Graduation project", status: "In progress", text: "Dishcover: 8 microservices, a RAG chatbot and Vision AI, live online." },
   { title: "SCTV", status: "Now", next: true, text: "Software Engineer Intern at Vietnam's leading cable TV and broadband network." },
 ];
@@ -294,7 +356,7 @@ function useReveal() {
 
 export function NghiaPage() {
   useReveal();
-  useHeroSnap("#projects");
+  useHeroSnap("#projects", ".ng-map");
   const [active, setActive] = useState<StackGroupId | null>(null);
   const [tech, setTechState] = useState<string | null>(null);
   const setTech = (t: string | null) => {

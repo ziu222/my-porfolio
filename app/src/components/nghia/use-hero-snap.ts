@@ -8,10 +8,11 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
 
 /**
  * One gesture per step through the hero: each wheel flick, swipe or arrow key glides to the next
- * story beat (the film scrubs along on the way), and one more from the last beat lands on the
- * projects. Below the hero the page scrolls normally.
+ * story beat, one more lands on the projects heading, and one more (with `fitSelector`) settles
+ * the element it names, the star map, centred in the viewport. Below that the page scrolls
+ * normally; scrolling back up into that range snaps again.
  */
-export function useHeroSnap(nextSelector: string) {
+export function useHeroSnap(nextSelector: string, fitSelector?: string) {
   useEffect(() => {
     const reduce = reducedMotion();
     let animating = false, raf = 0, lastWheel = 0, touchY: number | null = null;
@@ -21,6 +22,12 @@ export function useHeroSnap(nextSelector: string) {
       const next = document.querySelector<HTMLElement>(nextSelector);
       const ys = chapters.map((c) => Math.round(c.getBoundingClientRect().top + window.scrollY));
       if (next) ys.push(Math.round(next.getBoundingClientRect().top + window.scrollY));
+      const fit = fitSelector ? document.querySelector<HTMLElement>(fitSelector) : null;
+      if (fit) {
+        const r = fit.getBoundingClientRect();
+        const y = Math.round(r.top + window.scrollY - Math.max(0, (window.innerHeight - r.height) / 2));
+        if (y > ys[ys.length - 1] + 8) ys.push(y);
+      }
       return ys;
     };
     // the zone we own: anywhere above the last stop, or sitting on it and heading back up
@@ -96,5 +103,5 @@ export function useHeroSnap(nextSelector: string) {
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("keydown", onKey);
     };
-  }, [nextSelector]);
+  }, [nextSelector, fitSelector]);
 }
